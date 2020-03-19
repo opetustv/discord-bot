@@ -1,0 +1,22 @@
+{
+  "name": "opetustv-discord-bot",
+  "version": "0.0.1",
+  "description": "Discord bot for managing Opetus.tv's Discord server",
+  "main": "bot.js",
+  "keywords": [
+    "opetustv",
+    "opetus.tv"
+  ],
+  "author": "Janne Cederberg",
+  "license": "",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "discord.js": "^11.4.2",
+    "dotenv": "^8.1.0"
+  },
+  "engines": {
+    "node": "8.11.2"
+  }
+}
