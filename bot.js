@@ -11,38 +11,55 @@ const CONFIG = {
   filename: 'bot.config.json',
 
   /**
+   * Do not add roles to members of the following groups
+   */
+  roleNamesToSkip: ['perustajat', 'modet', 'Opetus.tv bot', 'TeXit', 'kirjoitusoikeus'],
+
+  /**
+   * Name of the Discord role that allows users to talk and share their screen in audio channels
+   */
+  roleNamesToAssign: ['puheoikeus', 'kirjoitusoikeus'],
+
+  /**
    * Keep track of who the bot has given the talkPermissionRoleName role already.
    *
    * This is so that the bot will only give the permissions once and if moderators revoke the role
    * from a given user, the bot should not give the role again.
    */
-  memberIdsThatReceivedTalkPermissionRole: [],
-
-  /**
-   * Do not add puheoikeus role to members of the following groups
-   */
-  roleNamesToSkip: ['perustajat', 'modet', 'Opetus.tv bot', 'TeXit', 'puheoikeus', 'mykistys'],
-
-  /**
-   * Name of the Discord role that allows users to talk and share their screen in audio channels
-   */
-  talkPermissionRoleName: 'puheoikeus'
+  rolesAssignedTo: []
 }
 
 /**
- * Assign the talkPermissionRoleName to the desired member
+ * Variable for holding a list of Discord.js's Role objects that we want to assign to the user
+ *
+ * Get initialized in the Client's .on('ready', callback) handler once per execution session
+ */
+let rolesToAssign
+
+/**
+ * Assign roles to the desired member
  *
  * @param {GuildMember} member The GuildMember object to whom a permission to talk role should be assigned
  */
-async function addTalkPermission (member) {
+async function assignRoles (member) {
   // Skip if the member has already been given the talk permission role earlier
-  if (CONFIG.memberIdsThatReceivedTalkPermissionRole.includes(member.id)) {
+  if (CONFIG.rolesAssignedTo.includes(member.id)) {
     return null
   }
 
-  const otv = client.guilds.first()
-  const roleTalkPermission = otv.roles.find(role => role.name === CONFIG.talkPermissionRoleName)
+  const server = client.guilds.first()
   const userRoleNames = member.roles.map(role => role.name)
+
+  /**
+   * Handle errors caught from member.addRole(role)
+   * @param {Error} error Error that was most likely caused by addRole request getting timed out
+   */
+  const handleErrorOnAddRole = error => {
+    console.log(`Assigning roles to ${member.user.username} timed out. Attempting again in 5 seconds.`)
+    setTimeout(() => {
+      member.addRole(role).catch(handleErrorOnAddRole)
+    }, 5000)
+  }
 
   // ignore users that have at least one of the roles defined in roleNamesToSkip
   for (const r of userRoleNames) {
@@ -51,10 +68,36 @@ async function addTalkPermission (member) {
     }
   }
 
+  rolesToAssign.forEach(async role => {
+    try {
+      await member.addRole(role)
+    } catch (error) {
+      handleErrorOnAddRole(error)
+    }
+  })
 
-  const m = await member.addRole(roleTalkPermission)
-  CONFIG.memberIdsThatReceivedTalkPermissionRole.push(member.id)
-  return m
+  CONFIG.rolesAssignedTo.push(member.id)
+  return member
+}
+
+/**
+ * Assign roles to a member only once
+ *
+ * @param {GuildMember} member The member that was added to the guild
+ */
+async function doRoleAssignmentToMember (member) {
+  if (CONFIG.rolesAssignedTo.includes(member.id)) {
+    return
+  }
+  try {
+    const m = await assignRoles(member)
+    if (m) {
+      console.log(`Member ${m.user.username} joined or came online and roles ${CONFIG.roleNamesToAssign} were assigned`)
+      fs.writeFileSync(CONFIG.filename, JSON.stringify(CONFIG))
+    }
+  } catch (err) {
+    console.error(err)
+  }
 }
 
 /**
@@ -71,22 +114,14 @@ client.on('message', msg => {
 });
 
 /**
+ * Event listener for when a member is added to the server
+ */
+client.on('guildMemberAdd', doRoleAssignmentToMember)
+
+/**
  * Event listener for when a user's status changes to "online"
  */
-client.on('guildMemberAvailable', async member => {
-  if (CONFIG.memberIdsThatReceivedTalkPermissionRole.includes(member.id)) {
-    return
-  }
-  try {
-    const m = await addTalkPermission(member)
-    CONFIG.memberIdsThatReceivedTalkPermissionRole.push(m.id)
-    console.log(`Member ${m.user.username} came online and talk permission was added`)
-    fs.writeFileSync(CONFIG.filename, JSON.stringify(CONFIG))
-  } catch (err) {
-    console.error(err)
-  }
-})
-
+client.on('guildMemberAvailable', doRoleAssignmentToMember)
 
 /**
  * Event listener for when bot has started running
@@ -94,36 +129,33 @@ client.on('guildMemberAvailable', async member => {
 client.on('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
-  const otv = client.guilds.first()
+  const server = client.guilds.first()
+  rolesToAssign = server.roles.filter(role => CONFIG.roleNamesToAssign.includes(role.name))
   let counter = 0;
 
-  otv.members.forEach(async (member, id) => {
+  server.members.forEach(async member => {
     setTimeout(async () => {
       try {
-        const m = await addTalkPermission(member);
+        const m = await assignRoles(member);
         if (m) {
-          CONFIG.memberIdsThatReceivedTalkPermissionRole.push(m.id)
-          console.log(`Talk permission role added to member: ${m.user.username}`)
+          console.log(`Roles ${CONFIG.roleNamesToAssign} added to member: ${m.user.username}`)
+          fs.writeFileSync(CONFIG.filename, JSON.stringify(CONFIG))
         }
       } catch (err) {
         console.error(err)
       }
-    }, 500 * counter);
+    }, 100 * counter);
     counter += 1;
   })
-
-  // Persist configuration, especially the member ids that have already received talk permission
-  fs.writeFileSync(CONFIG.filename, JSON.stringify(CONFIG))
 })
-
 
 /**
  * MAIN
  */
 try {
-  CONFIG.memberIdsThatReceivedTalkPermissionRole = JSON.parse(fs.readFileSync('bot.config.json', 'utf8')).memberIdsThatReceivedTalkPermissionRole
+  CONFIG.rolesAssignedTo = JSON.parse(fs.readFileSync('bot.config.json', 'utf8')).rolesAssignedTo
 } catch (err) {
-  CONFIG.memberIdsThatReceivedTalkPermissionRole = []
+  CONFIG.rolesAssignedTo = []
 }
 
 // Initialize bot by connecting to the server
