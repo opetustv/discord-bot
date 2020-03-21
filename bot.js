@@ -16,7 +16,7 @@ const CONFIG = {
   roleNamesToSkip: ['perustajat', 'modet', 'Opetus.tv bot', 'TeXit', 'kirjoitusoikeus'],
 
   /**
-   * Name of the Discord role that allows users to talk and share their screen in audio channels
+   * Names of the Discord roles that should be added to users by default
    */
   roleNamesToAssign: ['puheoikeus', 'kirjoitusoikeus'],
 
@@ -32,7 +32,7 @@ const CONFIG = {
 /**
  * Variable for holding a list of Discord.js's Role objects that we want to assign to the user
  *
- * Get initialized in the Client's .on('ready', callback) handler once per execution session
+ * Gets initialized in the Client's .on('ready', callback) handler once per execution session
  */
 let rolesToAssign
 
@@ -139,7 +139,11 @@ client.on('ready', async () => {
         const m = await assignRoles(member);
         if (m) {
           console.log(`Roles ${CONFIG.roleNamesToAssign} added to member: ${m.user.username}`)
-          fs.writeFileSync(CONFIG.filename, JSON.stringify(CONFIG))
+          // fs.writeFileSync would be much smarter to do after the forEach loop completes BUT
+          // the writeFileSync call it cannot simply be moved after the loop due to async function calls
+          // inside the loop...didn't wanna start figuring out how to use Promise.all(callback)
+          // or some similar right now since it's a nice day out :D maybe improve this later
+          fs.writeFileSync(CONFIG.filename, JSON.stringify(CONFIG)) // @todo
         }
       } catch (err) {
         console.error(err)
