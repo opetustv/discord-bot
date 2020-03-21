@@ -7,7 +7,9 @@ Currently only used for assigning an audio channel talk role (once) for all user
 1. `git clone https://github.com/opetustv/discord-bot.git opetustv-discord-bot`
 2. `cd opetustv-discord-bot`
 3. `npm install`
-4. You need a security token for your app. You'll place it in `.env.tmpl` and rename the file to `.env`. You'll create the token at https://discordapp.com/developers/applications and can for example follow along this article in doing so: https://www.howtogeek.com/364225/how-to-make-your-own-discord-bot/
+4. You need a security token for your app. You'll place it in `.env.tmpl` and rename the file to `.env`. You'll create the token at https://discordapp.com/developers/applications and can for example follow along one of these articles in doing so:
+    - https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token
+    - https://www.howtogeek.com/364225/how-to-make-your-own-discord-bot/
 5. Add the bot to a channel you manage
 6. Run the bot using `node bot.js`
 
