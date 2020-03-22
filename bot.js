@@ -17,14 +17,18 @@ const CONFIG = {
 
   /**
    * Names of the Discord roles that should be added to users by default
+   *
+   * Please notice that if you add to this list after bot has already been running, you need
+   * to delete bot.config.json for changes to be applied. Also please notice that removing
+   * a role name from this list WILL NOT cause that role to be revoked from users!
    */
   roleNamesToAssign: ['puheoikeus', 'kirjoitusoikeus'],
 
   /**
-   * Keep track of who the bot has given the talkPermissionRoleName role already.
+   * Keep track of who the bot has given the roles defined in roleNamesToAssign to already.
    *
-   * This is so that the bot will only give the permissions once and if moderators revoke the role
-   * from a given user, the bot should not give the role again.
+   * This is so that the bot will only assign the desired roles once; if moderators then revoke
+   * (some of) the role(s), the bot should not assign the role(s) again.
    */
   rolesAssignedTo: []
 }
@@ -39,10 +43,10 @@ let rolesToAssign
 /**
  * Assign roles to the desired member
  *
- * @param {GuildMember} member The GuildMember object to whom a permission to talk role should be assigned
+ * @param {GuildMember} member The GuildMember object to whom roles should be assigned to
  */
 async function assignRoles (member) {
-  // Skip if the member has already been given the talk permission role earlier
+  // Skip if the member has already been assigned the roles defined in `roleNamesToAssign`.
   if (CONFIG.rolesAssignedTo.includes(member.id)) {
     return null
   }
@@ -81,18 +85,21 @@ async function assignRoles (member) {
 }
 
 /**
- * Assign roles to a member only once
+ * Callback used on Client objects .on('eventName', callback) for assigning to members
+ *
+ * Will keep track of the users roles have already been assigned to and will
+ * do assigments only once per user
  *
  * @param {GuildMember} member The member that was added to the guild
  */
-async function doRoleAssignmentToMember (member) {
+async function roleAssignmentToMemberHandler (member) {
   if (CONFIG.rolesAssignedTo.includes(member.id)) {
     return
   }
   try {
     const m = await assignRoles(member)
     if (m) {
-      console.log(`Member ${m.user.username} joined or came online and roles ${CONFIG.roleNamesToAssign} were assigned`)
+      console.log(`The following member joined or came online and roles ${CONFIG.roleNamesToAssign} were assigned: ${m.user.username}`)
       fs.writeFileSync(CONFIG.filename, JSON.stringify(CONFIG))
     }
   } catch (err) {
@@ -101,32 +108,9 @@ async function doRoleAssignmentToMember (member) {
 }
 
 /**
- * Event listener for messages
+ * Event handler for when the Client object triggers its `ready` event
  */
-client.on('message', msg => {
-  // We check the message content and looks for the word "ping", so we can have the bot respond "pong"
-  if (msg.content === 'ping') {
-    msg.reply('pong');
-  }
-  if (msg.content.indexOf('kerro vitsi') > -1) {
-    msg.reply(vitsit[Math.floor(Math.random() * vitsit.length)])
-  }
-});
-
-/**
- * Event listener for when a member is added to the server
- */
-client.on('guildMemberAdd', doRoleAssignmentToMember)
-
-/**
- * Event listener for when a user's status changes to "online"
- */
-client.on('guildMemberAvailable', doRoleAssignmentToMember)
-
-/**
- * Event listener for when bot has started running
- */
-client.on('ready', async () => {
+async function clientReadyEventHandler () {
   console.log(`Logged in as ${client.user.tag}!`);
 
   const server = client.guilds.first()
@@ -151,7 +135,36 @@ client.on('ready', async () => {
     }, 100 * counter);
     counter += 1;
   })
-})
+}
+
+/**
+ * Event listener for messages
+ *
+ * Currently only responds to a `ping` message with `pong`.
+ * This can interactively be used to check that the bot is still running.
+ */
+client.on('message', msg => {
+  // We check the message content and looks for the word "ping", so we can have the bot respond "pong"
+
+  if (msg.content === 'ping') {
+    msg.reply('pong');
+  }
+});
+
+/**
+ * Event listener for when a member is added to the server
+ */
+client.on('guildMemberAdd', roleAssignmentToMemberHandler)
+
+/**
+ * Event listener for when a user's status changes to "online"
+ */
+client.on('guildMemberAvailable', roleAssignmentToMemberHandler)
+
+/**
+ * Event listener for when bot has started running
+ */
+client.on('ready', clientReadyEventHandler)
 
 /**
  * MAIN
