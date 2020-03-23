@@ -117,12 +117,19 @@ async function clientReadyEventHandler () {
   rolesToAssign = server.roles.filter(role => CONFIG.roleNamesToAssign.includes(role.name))
   let counter = 0;
 
+  // update members list
+  try {
+    await server.fetchMembers() // this will return a Promise<Guild> but will also update our `server`
+  } catch (err) {
+    console.error('Failed fetching an up-to-date list of server members, using a possibly stale list!')
+  }
+
   server.members.forEach(async member => {
     setTimeout(async () => {
       try {
         const m = await assignRoles(member);
         if (m) {
-          console.log(`Roles ${CONFIG.roleNamesToAssign} added to member: ${m.user.username}`)
+          console.log(`Roles ${CONFIG.roleNamesToAssign} were retrospectively assigned to: ${m.user.username}`)
           // fs.writeFileSync would be much smarter to do after the forEach loop completes BUT
           // the writeFileSync call it cannot simply be moved after the loop due to async function calls
           // inside the loop...didn't wanna start figuring out how to use Promise.all(callback)
