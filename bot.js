@@ -58,10 +58,12 @@ async function assignRoles (member) {
    * Handle errors caught from member.addRole(role)
    * @param {Error} error Error that was most likely caused by addRole request getting timed out
    */
-  const handleErrorOnAddRole = error => {
+  const handleErrorOnAddRole = (error, role) => {
     console.log(`Assigning roles to ${member.user.username} timed out. Attempting again in 5 seconds.`)
     setTimeout(() => {
-      member.addRole(role).catch(handleErrorOnAddRole)
+      member.addRole(role).catch((error) => {
+        handleErrorOnAddRole(error, role)
+      })
     }, 5000)
   }
 
@@ -76,7 +78,7 @@ async function assignRoles (member) {
     try {
       await member.addRole(role)
     } catch (error) {
-      handleErrorOnAddRole(error)
+      handleErrorOnAddRole(error, role)
     }
   })
 
